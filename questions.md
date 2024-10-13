@@ -4,4 +4,4 @@
 
 
 1. Redis Serialization Protocol
-2. Distinguish between bulk string and simple string while sending from a client
+2. Distinguish between bulk string and simple string while sending from a client -> Bulk string is with double quotes and simple string is without double quotes

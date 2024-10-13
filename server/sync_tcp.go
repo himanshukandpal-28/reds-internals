@@ -6,23 +6,36 @@ import (
 	"log"
 	"net"
 	"reds-internals/config"
+	"reds-internals/core"
+	"strings"
 )
 
-func readCommand(c net.Conn) (string, error) {
+func readCommand(c net.Conn) (*core.RedisCmd, error) {
 	// takes the read connection and fires the system call
 	var buf []byte = make([]byte, 512)
 	// blocking call :: waiting for the data to be read from the connection
 	n, err := c.Read(buf[:])
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return string(buf[:n]), nil
+
+	tokens, err := core.DecodeArrayString(buf[:n])
+
+	return &core.RedisCmd{
+		Cmd:  strings.ToUpper(tokens[0]),
+		Args: tokens[1:],
+	}, nil
 }
 
-func respond(c net.Conn, cmd string) error {
-	// takes the connection and the command and writes the command back to the client
-	_, err := c.Write([]byte(fmt.Sprintf("You said %s", cmd)))
-	return err
+func respondError(err error, c net.Conn) {
+	c.Write([]byte(fmt.Sprintf("-%s\r\n", err)))
+}
+
+func respond(c net.Conn, cmd *core.RedisCmd) {
+	err := core.EvalAndRespond(cmd, c)
+	if err != nil {
+		respondError(err, c)
+	}
 }
 
 func RunSyncTcpServer() {
@@ -64,9 +77,7 @@ func RunSyncTcpServer() {
 				log.Println("error reading command", err)
 			}
 			log.Println("received command", cmd)
-			if err = respond(conn, cmd); err != nil {
-				log.Println("error responding", err)
-			}
+			respond(conn, cmd)
 		}
 	}
 
